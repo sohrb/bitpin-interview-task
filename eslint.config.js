@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import tanstackQuery from "@tanstack/eslint-plugin-query";
 import prettier from "eslint-config-prettier";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import react from "eslint-plugin-react";
@@ -49,6 +50,7 @@ const config = ts.config(
       react.configs.flat["jsx-runtime"],
       reactRefresh.configs.vite,
       jsxA11y.flatConfigs.recommended,
+      tanstackQuery.configs["flat/recommended"],
     ],
     plugins: {
       "react-hooks": reactHooks,
