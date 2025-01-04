@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const IndexRoute = createFileRoute("/")({
+const IndexRoute = createFileRoute("/")({
   component: () => {
     return <></>;
   },
