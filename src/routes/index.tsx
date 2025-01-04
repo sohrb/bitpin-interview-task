@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 
 const IndexRoute = createFileRoute("/")({
   component: () => {
-    return <></>;
+    return <Navigate to="/markets" />;
   },
 });
 
