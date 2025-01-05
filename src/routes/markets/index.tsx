@@ -7,6 +7,11 @@ import { z } from "zod";
 import {
   Card,
   CardContent,
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
   ScrollArea,
   ScrollBar,
   Tabs,
@@ -14,11 +19,14 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
+import { PAGE_SIZE } from "@/configs";
 import { marketOptions } from "@/hooks/queries";
 import { cn } from "@/lib";
 
 const marketSearchSchema = z.object({
   currency2: fallback(z.enum(["USDT", "IRT"]), "USDT").default("USDT"),
+  page: fallback(z.number().nonnegative(), 1).default(1),
+  page_size: fallback(z.number().nonnegative(), 10).default(PAGE_SIZE),
 });
 
 const MarketsRoute = createFileRoute("/markets/")({
@@ -36,7 +44,18 @@ function MarketsComponent() {
       return state.currency2;
     },
   });
+  const page = MarketsRoute.useSearch({
+    select(state) {
+      return state.page;
+    },
+  });
+  const pageSize = MarketsRoute.useSearch({
+    select(state) {
+      return state.page_size;
+    },
+  });
   const { data: markets } = useSuspenseQuery(marketOptions(currency2));
+  const totalPages = Math.ceil(markets.length / pageSize);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-1 flex-col p-4 md:p-8">
@@ -48,7 +67,7 @@ function MarketsComponent() {
               const result =
                 marketSearchSchema.shape.currency2.safeParse(value);
               if (result.success) {
-                void navigate({ search: { currency2: result.data } });
+                void navigate({ search: { currency2: result.data, page: 1 } });
               }
             }}
           >
@@ -58,62 +77,115 @@ function MarketsComponent() {
               <TabsTrigger value="IRT">IRT</TabsTrigger>
             </TabsList>
 
-            <TabsContent value={currency2}>
-              <ScrollArea className="h-[calc(100dvh-9rem)] md:h-[calc(100dvh-11rem)]">
+            <TabsContent value={currency2} className="flex flex-col gap-2">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      className={cn(
+                        page > 1 ? "cursor-pointer" : "cursor-not-allowed",
+                      )}
+                      onClick={() => {
+                        if (page > 1) {
+                          void navigate({
+                            search: {
+                              currency2,
+                              page: page - 1,
+                            },
+                          });
+                        }
+                      }}
+                      aria-disabled={page === 1}
+                    />
+                  </PaginationItem>
+
+                  <span className="px-2 md:px-4">
+                    {page} of {totalPages}
+                  </span>
+
+                  <PaginationItem>
+                    <PaginationNext
+                      className={cn(
+                        page < totalPages
+                          ? "cursor-pointer"
+                          : "cursor-not-allowed",
+                      )}
+                      onClick={() => {
+                        if (page < totalPages) {
+                          void navigate({
+                            search: {
+                              currency2,
+                              page: page + 1,
+                            },
+                          });
+                        }
+                      }}
+                      aria-disabled={page === totalPages}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+
+              <ScrollArea className="h-[calc(100dvh-12rem)] md:h-[calc(100dvh-14rem)]">
                 <ScrollBar orientation="vertical" />
 
                 <ul className="flex flex-col gap-3">
-                  {markets.map((market) => {
-                    return (
-                      <li
-                        key={market.id}
-                        className="flex items-center justify-between rounded-md bg-card p-4 hover:bg-muted md:p-6"
-                      >
-                        <div className="flex items-center gap-2 md:gap-4">
-                          <img
-                            className="h-6 w-6"
-                            src={market.currency1.image}
-                            alt={`${market.currency1.code}`}
-                          />
+                  {markets
+                    .slice(page - 1, page + pageSize - 1)
+                    .map((market) => {
+                      return (
+                        <li
+                          key={market.id}
+                          className="flex items-center justify-between rounded-md bg-card p-4 hover:bg-muted md:p-6"
+                        >
+                          <div className="flex items-center gap-2 md:gap-4">
+                            <img
+                              className="h-6 w-6"
+                              src={market.currency1.image}
+                              alt={`${market.currency1.code}`}
+                            />
 
-                          <p className="font-medium">
-                            {market.code.replace("_", "/")}
-                          </p>
-                        </div>
+                            <span className="font-medium">
+                              {market.code.replace("_", "/")}
+                            </span>
+                          </div>
 
-                        <div className="flex items-center gap-2 md:gap-4">
-                          <NumericFormat
-                            displayType="text"
-                            thousandSeparator
-                            valueIsNumericString
-                            allowLeadingZeros={false}
-                            allowNegative={false}
-                            value={market.price}
-                            renderText={(formattedValue) => {
-                              return (
-                                <p>
-                                  {formattedValue} {market.currency2.code}
-                                </p>
-                              );
-                            }}
-                          />
+                          <div className="flex items-center gap-2 md:gap-4">
+                            <NumericFormat
+                              displayType="text"
+                              thousandSeparator
+                              valueIsNumericString
+                              allowLeadingZeros={false}
+                              allowNegative={false}
+                              value={market.price}
+                              renderText={(formattedValue) => {
+                                return (
+                                  <span>
+                                    {formattedValue} {market.currency2.code}
+                                  </span>
+                                );
+                              }}
+                            />
 
-                          <p
-                            className={cn(
-                              market.price_info.change > 0 && "text-green-500",
-                              market.price_info.change === 0 && "text-gray-500",
-                              market.price_info.change < 0 && "text-red-500",
-                            )}
-                          >
-                            {market.price_info.change > 0 && "+"}
-                            {market.price_info.change === 0 && "±"}
-                            {market.price_info.change < 0 && "-"}
-                            {Math.abs(market.price_info.change)}%
-                          </p>
-                        </div>
-                      </li>
-                    );
-                  })}
+                            <span
+                              className={cn(
+                                "hidden sm:block",
+                                market.price_info.change > 0 &&
+                                  "text-green-500",
+                                market.price_info.change === 0 &&
+                                  "text-gray-500",
+                                market.price_info.change < 0 && "text-red-500",
+                              )}
+                            >
+                              {market.price_info.change > 0 && "+"}
+                              {market.price_info.change === 0 && "±"}
+                              {market.price_info.change < 0 && "-"}
+                              {Math.abs(market.price_info.change)}%
+                            </span>
+                          </div>
+                        </li>
+                      );
+                    })}
                 </ul>
               </ScrollArea>
             </TabsContent>
