@@ -1,2 +1,3 @@
-export { axios } from "./axios";
+export { api } from "./api";
 export { cn } from "./cn";
+export { toDecimal } from "./toDecimal";

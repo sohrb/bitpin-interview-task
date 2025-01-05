@@ -14,13 +14,13 @@ const TanStackRouterDevtools = import.meta.env.PROD
 const RootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: () => {
     return (
-      <>
+      <div className="flex min-h-dvh antialiased">
         <Outlet />
 
         <ReactQueryDevtools />
 
         <TanStackRouterDevtools />
-      </>
+      </div>
     );
   },
 });
