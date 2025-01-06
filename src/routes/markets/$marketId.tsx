@@ -2,7 +2,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import Decimal from "decimal.js";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NumericFormat } from "react-number-format";
 import { z } from "zod";
 
@@ -11,6 +11,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Input,
   ScrollArea,
   ScrollBar,
   Tabs,
@@ -18,6 +19,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
+import { useDebounceValue } from "@/hooks";
 import { marketOptions, ordersOptions } from "@/hooks/queries";
 import { toDecimal } from "@/lib";
 
@@ -80,6 +82,36 @@ function MarketComponent() {
       : undefined;
   }, [orders, totalRemain]);
 
+  const [totalRemainPercentage, setTotalRemainPercentage] =
+    useState<string>("");
+  const debouncedTotalRemainPercentage = useDebounceValue(
+    totalRemainPercentage,
+  );
+
+  const remain = useMemo(() => {
+    return orders.length > 0 &&
+      !!debouncedTotalRemainPercentage &&
+      !!totalRemain
+      ? toDecimal(debouncedTotalRemainPercentage)
+          .dividedBy(100)
+          .mul(totalRemain)
+          .toFixed()
+      : undefined;
+  }, [debouncedTotalRemainPercentage, orders.length, totalRemain]);
+
+  const payable = useMemo(() => {
+    return remain && weightedAveragePrice && debouncedTotalRemainPercentage
+      ? toDecimal(debouncedTotalRemainPercentage)
+          .dividedBy(100)
+          .mul(weightedAveragePrice)
+          .toFixed()
+      : undefined;
+  }, [debouncedTotalRemainPercentage, remain, weightedAveragePrice]);
+
+  useEffect(() => {
+    setTotalRemainPercentage("");
+  }, [tab]);
+
   if (!market) {
     return null;
   }
@@ -117,7 +149,53 @@ function MarketComponent() {
               <TabsTrigger value="trades">Trades</TabsTrigger>
             </TabsList>
 
-            <div className="grid grid-cols-3 place-items-center rounded-md border-[1px] border-border p-4 md:p-6">
+            <NumericFormat
+              displayType="input"
+              customInput={Input}
+              className="mb-2 hidden md:block"
+              valueIsNumericString
+              allowLeadingZeros
+              allowNegative
+              decimalScale={2}
+              value={totalRemainPercentage}
+              onValueChange={({ value }) => {
+                setTotalRemainPercentage(value);
+              }}
+              thousandSeparator
+              placeholder="Total Remain Percentage"
+            />
+
+            <div className="mb-2 hidden grid-cols-2 place-items-center rounded-md border-[1px] border-border p-4 md:grid md:p-6">
+              <span>Remain:</span>
+
+              <span>Payable:</span>
+
+              <NumericFormat
+                displayType="text"
+                thousandSeparator
+                valueIsNumericString
+                allowLeadingZeros={false}
+                allowNegative={false}
+                value={remain ?? ""}
+                renderText={(formattedValue) => {
+                  return <span>{formattedValue}</span>;
+                }}
+              />
+
+              <NumericFormat
+                displayType="text"
+                thousandSeparator
+                valueIsNumericString
+                allowLeadingZeros={false}
+                allowNegative={false}
+                value={payable ?? ""}
+                renderText={(formattedValue) => {
+                  return <span>{formattedValue}</span>;
+                }}
+              />
+            </div>
+
+            <div className="hidden grid-cols-3 place-items-center rounded-md border-[1px] border-border p-4 md:grid md:p-6">
               <span>Total Remain:</span>
 
               <span>Weighted Avg Price:</span>
@@ -163,7 +241,7 @@ function MarketComponent() {
 
             {tab !== "trades" && (
               <TabsContent value={tab}>
-                <ScrollArea className="h-[calc(100dvh-19rem)] md:h-[calc(100dvh-21rem)]">
+                <ScrollArea className="h-[calc(100dvh-12rem)] md:h-[calc(100dvh-31rem)]">
                   <ScrollBar orientation="vertical" />
 
                   <ul className="flex flex-col gap-3">
