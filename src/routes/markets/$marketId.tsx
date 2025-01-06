@@ -1,4 +1,4 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import Decimal from "decimal.js";
@@ -20,8 +20,8 @@ import {
   TabsTrigger,
 } from "@/components/ui";
 import { useDebounceValue } from "@/hooks";
-import { marketOptions, ordersOptions } from "@/hooks/queries";
-import { toDecimal } from "@/lib";
+import { marketOptions, useOrders, useTrades } from "@/hooks/queries";
+import { formatTimestamp, toDecimal } from "@/lib";
 
 const marketSearchSchema = z.object({
   tab: fallback(z.enum(["buy", "sell", "trades"]), "buy").default("buy"),
@@ -50,15 +50,20 @@ function MarketComponent() {
     },
   });
   const { data: market } = useSuspenseQuery(marketOptions(marketId));
-  const { data } = useQuery(
-    ordersOptions(marketId, tab as "buy" | "sell", {
-      enabled: tab !== "trades",
-    }),
-  );
+  const { data: ordersData } = useOrders(marketId, tab as "buy" | "sell", {
+    enabled: tab !== "trades",
+  });
+  const { data: tradesData } = useTrades(marketId, {
+    enabled: tab === "trades",
+  });
 
   const orders = useMemo(() => {
-    return data ? data.slice(0, 10) : [];
-  }, [data]);
+    return ordersData ? ordersData.slice(0, 10) : [];
+  }, [ordersData]);
+
+  const trades = useMemo(() => {
+    return tradesData ? tradesData.slice(0, 10) : [];
+  }, [tradesData]);
 
   const totalValue = useMemo(() => {
     return orders.length > 0
@@ -108,6 +113,18 @@ function MarketComponent() {
       : undefined;
   }, [debouncedTotalRemainPercentage, remain, weightedAveragePrice]);
 
+  const tradesWeightedAveragePrice = useMemo(() => {
+    return trades.length > 0
+      ? Decimal.sum(
+          ...trades.map((trade) =>
+            toDecimal(trade.match_amount).mul(trade.price),
+          ),
+        )
+          .dividedBy(Decimal.sum(...trades.map((trade) => trade.match_amount)))
+          .toFixed()
+      : undefined;
+  }, [trades]);
+
   useEffect(() => {
     setTotalRemainPercentage("");
   }, [tab]);
@@ -149,98 +166,98 @@ function MarketComponent() {
               <TabsTrigger value="trades">Trades</TabsTrigger>
             </TabsList>
 
-            <NumericFormat
-              displayType="input"
-              customInput={Input}
-              className="mb-2 hidden md:block"
-              valueIsNumericString
-              allowLeadingZeros
-              allowNegative
-              decimalScale={2}
-              value={totalRemainPercentage}
-              onValueChange={({ value }) => {
-                setTotalRemainPercentage(value);
-              }}
-              thousandSeparator
-              placeholder="Total Remain Percentage"
-            />
-
-            <div className="mb-2 hidden grid-cols-2 place-items-center rounded-md border-[1px] border-border p-4 md:grid md:p-6">
-              <span>Remain:</span>
-
-              <span>Payable:</span>
-
-              <NumericFormat
-                displayType="text"
-                thousandSeparator
-                valueIsNumericString
-                allowLeadingZeros={false}
-                allowNegative={false}
-                value={remain ?? ""}
-                renderText={(formattedValue) => {
-                  return <span>{formattedValue}</span>;
-                }}
-              />
-
-              <NumericFormat
-                displayType="text"
-                thousandSeparator
-                valueIsNumericString
-                allowLeadingZeros={false}
-                allowNegative={false}
-                value={payable ?? ""}
-                renderText={(formattedValue) => {
-                  return <span>{formattedValue}</span>;
-                }}
-              />
-            </div>
-
-            <div className="hidden grid-cols-3 place-items-center rounded-md border-[1px] border-border p-4 md:grid md:p-6">
-              <span>Total Remain:</span>
-
-              <span>Weighted Avg Price:</span>
-
-              <span>Total Value:</span>
-
-              <NumericFormat
-                displayType="text"
-                thousandSeparator
-                valueIsNumericString
-                allowLeadingZeros={false}
-                allowNegative={false}
-                value={totalRemain ?? ""}
-                renderText={(formattedValue) => {
-                  return <span>{formattedValue}</span>;
-                }}
-              />
-
-              <NumericFormat
-                displayType="text"
-                thousandSeparator
-                valueIsNumericString
-                allowLeadingZeros={false}
-                allowNegative={false}
-                value={weightedAveragePrice ?? ""}
-                renderText={(formattedValue) => {
-                  return <span>{formattedValue}</span>;
-                }}
-              />
-
-              <NumericFormat
-                displayType="text"
-                thousandSeparator
-                valueIsNumericString
-                allowLeadingZeros={false}
-                allowNegative={false}
-                value={totalValue ?? ""}
-                renderText={(formattedValue) => {
-                  return <span>{formattedValue}</span>;
-                }}
-              />
-            </div>
-
             {tab !== "trades" && (
               <TabsContent value={tab}>
+                <NumericFormat
+                  displayType="input"
+                  customInput={Input}
+                  className="mb-2 hidden md:block"
+                  valueIsNumericString
+                  allowLeadingZeros
+                  allowNegative
+                  decimalScale={2}
+                  value={totalRemainPercentage}
+                  onValueChange={({ value }) => {
+                    setTotalRemainPercentage(value);
+                  }}
+                  thousandSeparator
+                  placeholder="Total Remain Percentage"
+                />
+
+                <div className="mb-2 hidden grid-cols-2 place-items-center rounded-md border-[1px] border-border p-4 md:grid md:p-6">
+                  <span>Remain:</span>
+
+                  <span>Payable:</span>
+
+                  <NumericFormat
+                    displayType="text"
+                    thousandSeparator
+                    valueIsNumericString
+                    allowLeadingZeros={false}
+                    allowNegative={false}
+                    value={remain ?? ""}
+                    renderText={(formattedValue) => {
+                      return <span>{formattedValue}</span>;
+                    }}
+                  />
+
+                  <NumericFormat
+                    displayType="text"
+                    thousandSeparator
+                    valueIsNumericString
+                    allowLeadingZeros={false}
+                    allowNegative={false}
+                    value={payable ?? ""}
+                    renderText={(formattedValue) => {
+                      return <span>{formattedValue}</span>;
+                    }}
+                  />
+                </div>
+
+                <div className="mb-2 hidden grid-cols-3 place-items-center rounded-md border-[1px] border-border p-4 md:grid md:p-6">
+                  <span>Total Remain:</span>
+
+                  <span>Weighted Avg Price:</span>
+
+                  <span>Total Value:</span>
+
+                  <NumericFormat
+                    displayType="text"
+                    thousandSeparator
+                    valueIsNumericString
+                    allowLeadingZeros={false}
+                    allowNegative={false}
+                    value={totalRemain ?? ""}
+                    renderText={(formattedValue) => {
+                      return <span>{formattedValue}</span>;
+                    }}
+                  />
+
+                  <NumericFormat
+                    displayType="text"
+                    thousandSeparator
+                    valueIsNumericString
+                    allowLeadingZeros={false}
+                    allowNegative={false}
+                    value={weightedAveragePrice ?? ""}
+                    renderText={(formattedValue) => {
+                      return <span>{formattedValue}</span>;
+                    }}
+                  />
+
+                  <NumericFormat
+                    displayType="text"
+                    thousandSeparator
+                    valueIsNumericString
+                    allowLeadingZeros={false}
+                    allowNegative={false}
+                    value={totalValue ?? ""}
+                    renderText={(formattedValue) => {
+                      return <span>{formattedValue}</span>;
+                    }}
+                  />
+                </div>
+
                 <ScrollArea className="h-[calc(100dvh-12rem)] md:h-[calc(100dvh-31rem)]">
                   <ScrollBar orientation="vertical" />
 
@@ -300,7 +317,72 @@ function MarketComponent() {
               </TabsContent>
             )}
 
-            {tab === "trades" && <TabsContent value={tab}></TabsContent>}
+            {tab === "trades" && (
+              <TabsContent value={tab}>
+                <div className="mb-2 hidden grid-cols-1 place-items-center rounded-md border-[1px] border-border p-4 md:grid md:p-6">
+                  <span>Weighted Avg Price:</span>
+
+                  <NumericFormat
+                    displayType="text"
+                    thousandSeparator
+                    valueIsNumericString
+                    allowLeadingZeros={false}
+                    allowNegative={false}
+                    value={tradesWeightedAveragePrice ?? ""}
+                    renderText={(formattedValue) => {
+                      return <span>{formattedValue}</span>;
+                    }}
+                  />
+                </div>
+
+                <ScrollArea className="h-[calc(100dvh-12rem)] md:h-[calc(100dvh-21rem)]">
+                  <ScrollBar orientation="vertical" />
+
+                  <ul className="flex flex-col gap-3">
+                    {trades.map((trade) => {
+                      return (
+                        <li
+                          key={trade.match_id}
+                          className="grid grid-cols-3 place-items-center rounded-md bg-card p-4 hover:cursor-pointer hover:bg-muted md:p-6"
+                        >
+                          <span>Match Amount</span>
+
+                          <span>Price:</span>
+
+                          <span>Time:</span>
+
+                          <NumericFormat
+                            displayType="text"
+                            thousandSeparator
+                            valueIsNumericString
+                            allowLeadingZeros={false}
+                            allowNegative={false}
+                            value={trade.match_amount}
+                            renderText={(formattedValue) => {
+                              return <span>{formattedValue}</span>;
+                            }}
+                          />
+
+                          <NumericFormat
+                            displayType="text"
+                            thousandSeparator
+                            valueIsNumericString
+                            allowLeadingZeros={false}
+                            allowNegative={false}
+                            value={trade.price}
+                            renderText={(formattedValue) => {
+                              return <span>{formattedValue}</span>;
+                            }}
+                          />
+
+                          <span>{formatTimestamp(trade.time)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </ScrollArea>
+              </TabsContent>
+            )}
           </Tabs>
         </CardContent>
       </Card>

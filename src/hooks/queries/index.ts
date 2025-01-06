@@ -5,4 +5,4 @@ export {
   useMarkets,
 } from "./useMarkets";
 export { ordersOptions, useOrders } from "./useOrders";
-export {} from "./useTrades";
+export { tradesOptions, useTrades } from "./useTrades";
