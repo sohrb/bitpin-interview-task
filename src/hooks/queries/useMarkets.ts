@@ -18,15 +18,40 @@ async function getMarkets(): Promise<Market[]> {
   return getMarketsResponseSchema.parse(data).results;
 }
 
-export function marketOptions(currency2: string) {
+export function marketOptions(id: number) {
+  return queryOptions({
+    queryKey: ["markets", id],
+    queryFn: getMarkets,
+    select: (markets) => {
+      const market = markets.find((market) => market.id === id);
+      if (!market) {
+        return undefined;
+      }
+
+      return {
+        ...market,
+        price:
+          market.currency2.code === "IRT"
+            ? toDecimal(market.price).toDP(IRT_DP_PLACES).toFixed()
+            : toDecimal(market.price).toDP(USDT_DP_PLACES).toFixed(),
+        price_info: {
+          change: market.price_info.change
+            ? Number(toDecimal(market.price_info.change).toDP(2).toFixed())
+            : 0,
+        },
+      };
+    },
+    staleTime: Infinity,
+  });
+}
+
+export function marketsOptions(currency2: string) {
   return queryOptions({
     queryKey: ["markets", currency2],
     queryFn: getMarkets,
     select: (markets) => {
       return markets
-        .filter((market) => {
-          return market.currency2.code === currency2;
-        })
+        .filter((market) => market.currency2.code === currency2)
         .map(({ price, price_info, ...rest }) => {
           return {
             ...rest,
@@ -47,5 +72,9 @@ export function marketOptions(currency2: string) {
 }
 
 export function useMarkets(currency2: string) {
-  return useQuery(marketOptions(currency2));
+  return useQuery(marketsOptions(currency2));
+}
+
+export function useMarket(id: number) {
+  return useQuery(marketOptions(id));
 }

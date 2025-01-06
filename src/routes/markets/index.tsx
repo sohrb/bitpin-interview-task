@@ -20,20 +20,20 @@ import {
   TabsTrigger,
 } from "@/components/ui";
 import { PAGE_SIZE } from "@/configs";
-import { marketOptions } from "@/hooks/queries";
+import { marketsOptions } from "@/hooks/queries";
 import { cn } from "@/lib";
 
-const marketSearchSchema = z.object({
+const marketsSearchSchema = z.object({
   currency2: fallback(z.enum(["USDT", "IRT"]), "USDT").default("USDT"),
   page: fallback(z.number().nonnegative(), 1).default(1),
   page_size: fallback(z.number().nonnegative(), 10).default(PAGE_SIZE),
 });
 
 const MarketsRoute = createFileRoute("/markets/")({
-  validateSearch: zodValidator(marketSearchSchema),
+  validateSearch: zodValidator(marketsSearchSchema),
   loaderDeps: ({ search: { currency2 } }) => ({ currency2 }),
   loader: ({ context: { queryClient }, deps: { currency2 } }) =>
-    queryClient.ensureQueryData(marketOptions(currency2)),
+    queryClient.ensureQueryData(marketsOptions(currency2)),
   component: MarketsComponent,
 });
 
@@ -54,7 +54,7 @@ function MarketsComponent() {
       return state.page_size;
     },
   });
-  const { data: markets } = useSuspenseQuery(marketOptions(currency2));
+  const { data: markets } = useSuspenseQuery(marketsOptions(currency2));
   const totalPages = Math.ceil(markets.length / pageSize);
 
   return (
@@ -65,7 +65,7 @@ function MarketsComponent() {
             value={currency2}
             onValueChange={(value) => {
               const result =
-                marketSearchSchema.shape.currency2.safeParse(value);
+                marketsSearchSchema.shape.currency2.safeParse(value);
               if (result.success) {
                 void navigate({ search: { currency2: result.data, page: 1 } });
               }
@@ -91,6 +91,7 @@ function MarketsComponent() {
                             search: {
                               currency2,
                               page: page - 1,
+                              page_size: pageSize,
                             },
                           });
                         }
@@ -116,6 +117,7 @@ function MarketsComponent() {
                             search: {
                               currency2,
                               page: page + 1,
+                              page_size: pageSize,
                             },
                           });
                         }
@@ -131,12 +133,19 @@ function MarketsComponent() {
 
                 <ul className="flex flex-col gap-3">
                   {markets
-                    .slice(page - 1, page + pageSize - 1)
+                    .slice((page - 1) * pageSize, page * pageSize)
                     .map((market) => {
                       return (
+                        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
                         <li
                           key={market.id}
-                          className="flex items-center justify-between rounded-md bg-card p-4 hover:bg-muted md:p-6"
+                          className="flex items-center justify-between rounded-md bg-card p-4 hover:cursor-pointer hover:bg-muted md:p-6"
+                          onClick={() => {
+                            void navigate({
+                              to: "/markets/$marketId",
+                              params: { marketId: market.id.toString() },
+                            });
+                          }}
                         >
                           <div className="flex items-center gap-2 md:gap-4">
                             <img
